@@ -497,6 +497,69 @@ function Get-GitCommit {
 	}
 }
 
+function Get-GitCommits {
+	<#
+    .SYNOPSIS
+        Retrieves a list of commits for a branch or ref.
+    .DESCRIPTION
+        Returns an array of hashtables with commit information (using Get-GitCommit) for each commit in the specified branch or ref, in reverse chronological order.
+    .PARAMETER Ref
+        The branch, tag, or ref to retrieve commits from. Defaults to the current branch.
+    .PARAMETER MaxCount
+        The maximum number of commits to retrieve. If not specified, returns all.
+    .PARAMETER ParentMode
+        Controls how parent refs are followed. Valid values: 'All' (default, follow all parents), 'First' (first-parent only).
+    .EXAMPLE
+        Get-GitCommits
+        # Retrieves all commits for the current branch. "I find your lack of commits disturbing."
+    .EXAMPLE
+        Get-GitCommits -Ref "main" -MaxCount 5 -ParentMode First
+        # Retrieves the last 5 commits from 'main', following only the first parent. "The Force is strong with this branch."
+    #>
+	[CmdletBinding()]
+	param (
+		[Parameter(Mandatory = $false)]
+		[string]
+		$Ref,
+
+		[Parameter(Mandatory = $false)]
+		[int]
+		$MaxCount,
+
+		[Parameter(Mandatory = $false)]
+		[ValidateSet('All', 'First')]
+		[string]
+		$ParentMode = 'All'
+	)
+
+	if (-not $Ref) {
+		$Ref = git rev-parse --abbrev-ref HEAD 2>$null
+		if (-not $Ref) {
+			Write-Error "Could not determine the current branch. Help me, Obi-Wan Kenobi. You're my only hope."
+			return $null
+		}
+	}
+
+	$args = @()
+	if ($ParentMode -eq 'First') {
+		$args += '--first-parent'
+	}
+	if ($MaxCount -gt 0) {
+		$args += "--max-count=$MaxCount"
+	}
+	$args += $Ref
+
+	$commitHashes = git rev-list @args 2>$null
+	$result = @()
+	foreach ($hash in $commitHashes) {
+		$commit = Get-GitCommit -Commit $hash
+		if ($commit) {
+			$result += $commit
+		}
+	}
+	return $result
+}
+
 function Add-GitNote {
 	<#
     .SYNOPSIS
