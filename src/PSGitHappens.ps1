@@ -621,6 +621,80 @@ function Add-GitNote {
 	}
 }
 
+function Get-GitNote {
+	<#
+    .SYNOPSIS
+        Retrieves the note attached to a given Git commit.
+    .DESCRIPTION
+        Returns the note as a string or as a hashtable (if it is valid JSON) for the specified commit.
+    .PARAMETER Commit
+        The commit hash or reference to retrieve the note for. Defaults to HEAD.
+    .EXAMPLE
+        Get-GitNote -Commit HEAD
+        # Retrieves the note for the latest commit. "These aren't the notes you're looking for."
+    .EXAMPLE
+        Get-GitNote -Commit abc123
+        # Retrieves the note for commit abc123. "The Force will be with you. Always."
+    #>
+	[CmdletBinding()]
+	param (
+		[Parameter(Mandatory = $false)]
+		[string]
+		$Commit = 'HEAD'
+	)
+
+	$note = git notes show $Commit 2>$null
+	if ($note) {
+		try {
+			return $note | ConvertFrom-Json -ErrorAction Stop
+		}
+		catch {
+			return $note
+		}
+	}
+ else {
+		return $null
+	}
+}
+
+function Get-GitNotes {
+	<#
+    .SYNOPSIS
+        Retrieves all git notes and the refs (commits) they are attached to.
+    .DESCRIPTION
+        Returns an array of hashtables, each containing the commit hash and the note (as string or hashtable if JSON).
+    .EXAMPLE
+        Get-GitNotes
+        # Lists all notes and their associated commits. "So many notes, so little time."
+    #>
+	[CmdletBinding()]
+	param ()
+
+	$notesRaw = git notes list 2>$null
+	$result = @()
+
+	foreach ($line in $notesRaw) {
+		if ($line -match '^([a-f0-9]+)\s+([a-f0-9]+)$') {
+			$noteObj = @{
+				NoteObject = $matches[1]
+				Commit     = $matches[2]
+				Note       = $null
+			}
+			$noteText = git notes show $noteObj.Commit 2>$null
+			if ($noteText) {
+				try {
+					$noteObj.Note = $noteText | ConvertFrom-Json -ErrorAction Stop
+				}
+				catch {
+					$noteObj.Note = $noteText
+				}
+			}
+			$result += $noteObj
+		}
+	}
+	return $result
+}
+
 function Show-GitTree {
 	<#
     .SYNOPSIS
