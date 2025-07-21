@@ -620,3 +620,40 @@ function Add-GitNote {
 		git notes add -m $noteText $Commit
 	}
 }
+
+function Show-GitTree {
+	<#
+    .SYNOPSIS
+        Shows a graphical git log, supporting both 'tree' and 'lg' alias styles.
+    .DESCRIPTION
+        Displays the commit history as a colored graph. Use the -Style parameter to select the output format.
+    .PARAMETER Style
+        The log style to use. 'Tree' shows a decorated commit tree for all refs (like the 'tree' alias). 'Graph' shows a detailed commit graph (like the 'lg' alias).
+    .PARAMETER Args
+        Additional arguments to pass to git log.
+    .EXAMPLE
+        Show-GitTree -Style Tree
+        # Shows the decorated commit tree for all refs. "Much to learn, you still have."
+    .EXAMPLE
+        Show-GitTree -Style Graph
+        # Shows the commit graph for the current branch. "The Force will be with you. Always."
+    #>
+	[CmdletBinding()]
+	param (
+		[Parameter(Mandatory = $false)]
+		[ValidateSet('Tree', 'Graph')]
+		[string]
+		$Style = 'Tree',
+
+		[Parameter(Mandatory = $false)]
+		[string[]]
+		$Args
+	)
+
+	if ($Style -eq 'Graph') {
+		git log --color --graph --pretty=format:"%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset" --abbrev-commit @Args
+	}
+ else {
+		git log --color --graph --decorate --oneline --tags --all --abbrev-commit @Args
+	}
+}
