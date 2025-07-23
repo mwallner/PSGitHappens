@@ -71,19 +71,19 @@ function Get-GitEnv {
 	[CmdletBinding()]
 	param (
 		[Parameter(Mandatory = $false)]
-		[hashtable]
+		[AllowNull()][hashtable]
 		$Author,
 
 		[Parameter(Mandatory = $false)]
-		[datetime]
+		[AllowNull()][Nullable[datetime]]
 		$AuthorDate,
 
 		[Parameter(Mandatory = $false)]
-		[hashtable]
+		[AllowNull()][hashtable]
 		$Committer,
 
 		[Parameter(Mandatory = $false)]
-		[datetime]
+		[AllowNull()][Nullable[datetime]]
 		$CommitterDate
 	)
 
@@ -162,7 +162,7 @@ function New-GitRepo {
 			git checkout -b $MainBranchName | Out-Null
 		}
 	}
- finally {
+	finally {
 		Pop-Location
 	}
 }
@@ -349,6 +349,9 @@ function New-GitCommit {
         DateTime for the committer date.
     .PARAMETER Note
         Optional note (string or hashtable) to attach to the commit.
+    .PARAMETER Merge
+        Optional parameter that generates a merge commit instead of a normal one
+        [hashtable]@{Source, AdditionalArgs}
     .EXAMPLE
         New-Commit -Message 'Initial commit' -Author @{ Name='Alice'; Email='alice@waydowntherabbithole.com' } -Note "Reviewed by Alice"
     #>
@@ -380,19 +383,35 @@ function New-GitCommit {
 
 		[Parameter(Mandatory = $false)]
 		[Object]
-		$Note
+		$Note,
+
+		[Parameter(Mandatory = $false)]
+		[hashtable]
+		$Merge
 	)
 
-	$gitEnv = Get-GitEnv @params
+	$gitEnv = Get-GitEnv -Author $Author -AuthorDate $AuthorDate -Committer $Committer -CommitterDate $CommitterDate
 
 	$commitResult = Invoke-WithEnv -SyntheticEnv $gitEnv -ScriptBlock {
-		git commit -m $Message
+		if ($Merge) {
+			git merge $Merge.AdditionalArgs --no-commit $Merge.Source
+		}
+		if ($AllowEmpty) {
+			git commit -m $Message --allow-empty
+		}
+		else {
+			git commit -m $Message
+		}
 	}
 	Write-Verbose "Commit result: $commitResult"
+  
+	if (($commitResult.Count -ge 2) -and ($commitResult[0] -eq 'Already up to date.')) {
+		$commitResult = $commitResult[1..($commitResult.Length - 1)]
+	}
 
 	$commitResChecker = [regex]'^\[(?<branch>\S+|detached HEAD)\s(?<root>\(root-commit\)\s)?(?<shortHash>[A-Fa-f0-9]+)\]\s(?<title>.*)$'
 
-	if ($commitResult -match $commitResChecker) {
+	if ([string]($commitResult) -match $commitResChecker) {
 		$commitInfo = @{
 			Branch       = $matches['branch']
 			ShortHash    = $matches['shortHash']
@@ -606,18 +625,25 @@ function Add-GitNote {
 	if ($Note -is [hashtable]) {
 		$noteText = $Note | ConvertTo-Json -Compress
 	}
- else {
+	else {
 		$noteText = [string]$Note
 	}
 
-	if ($Append) {
-		git notes append -m $noteText $Commit
+	$tmpFile = New-TemporaryFile
+	$noteText | Out-File -FilePath $tmpFile.FullName -Encoding utf8
+	try {
+		if ($Append) {
+			git notes append -F $tmpFile.FullName $Commit
+		}
+		elseif ($Force) {
+			git notes add -f -F $tmpFile.FullName $Commit
+		}
+		else {
+			git notes add -F $tmpFile.FullName $Commit
+		}
 	}
- elseif ($Force) {
-		git notes add -f -m $noteText $Commit
-	}
- else {
-		git notes add -m $noteText $Commit
+	finally {
+		Remove-Item $tmpFile -Force
 	}
 }
 
@@ -652,7 +678,7 @@ function Get-GitNote {
 			return $note
 		}
 	}
- else {
+	else {
 		return $null
 	}
 }
@@ -727,7 +753,7 @@ function Show-GitTree {
 	if ($Style -eq 'Graph') {
 		git log --color --graph --pretty=format:"%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset" --abbrev-commit @Args
 	}
- else {
+	else {
 		git log --color --graph --decorate --oneline --tags --all --abbrev-commit @Args
 	}
 }
