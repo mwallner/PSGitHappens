@@ -449,7 +449,7 @@ function Get-GitCommit {
 	)
 
 	# Get commit info using git show --no-patch --format
-	$format = '%D|%h|%s|%an|%ae|%ad|%cn|%ce|%cd'
+	$format = '%D|-|-|%h|-|-|%s|-|-|%an|-|-|%ae|-|-|%ad|-|-|%cn|-|-|%ce|-|-|%cd'
 	$gitShow = git show --no-patch --format="$format" $Commit 2>$null | Select-Object -First 1
 
 	if (-not $gitShow) {
@@ -468,7 +468,7 @@ function Get-GitCommit {
 	$committerEmail = $null
 	$committerDate = $null
 
-	$parts = $gitShow -split '\|', 9
+	$parts = $gitShow -split '\|-\|-\|', 9
 	if ($parts.Count -eq 9) {
 		$refDesc, $shortHash, $title, $authorName, $authorEmail, $authorDate, $committerName, $committerEmail, $committerDate = $parts
 		if ($refDesc) {
