@@ -757,3 +757,25 @@ function Show-GitTree {
 		git log --color --graph --decorate --oneline --tags --all --abbrev-commit @Args
 	}
 }
+
+function ConvertFrom-GitDate {
+ <#
+    .SYNOPSIS
+        Converts a Git-formatted date string to a PowerShell DateTime object.
+    .DESCRIPTION
+        Parses a date string in the format output by Git (e.g., 'Thu Apr 20 14:53:22 2023 +0200') and returns a [datetime] object.
+        This is useful for converting Git commit dates to native PowerShell DateTime for further processing.
+    .PARAMETER GitDateString
+        The Git-formatted date string to convert.
+    .EXAMPLE
+        ConvertFrom-GitDate -GitDateString 'Thu Apr 20 14:53:22 2023 +0200'
+        # Returns a DateTime object representing the specified date.
+    #>
+	[CmdletBinding()]
+	param (
+		[Parameter(Mandatory)]
+		[string]
+		$GitDateString
+	) 
+	[datetime]::ParseExact($GitDateString, 'ddd MMM d HH:mm:ss yyyy zzz', [cultureinfo]::InvariantCulture)
+}
